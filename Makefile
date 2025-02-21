@@ -1,4 +1,4 @@
-IMAGE_NAME := explosion
+IMAGE_NAME := mats
 CONTAINER_NAME := detnet
 DOCKER_TAG := latest
 PURE_TAG := pure
@@ -45,13 +45,13 @@ jupyter:
 	jupyter lab --allow-root --ip=0.0.0.0 --port=8888 --no-browser --NotebookApp.token=msuai
 
 build:
-	docker build -f Dockerfile -t $(IMAGE_NAME)_$(PURE_TAG) .
+	docker build -f Dockerfile -t $(IMAGE_NAME) .
 
-run_docker_pure_bash:
-	docker run -it \
+run_docker:
+	docker run -it --rm \
 		--ipc=host \
-  		--network=host \
-  		--gpus=all \
-  		-v ./:/app/ \
-  		--name $(CONTAINER_NAME) \
-  		$(IMAGE_NAME) bash
+		--network=host \
+		--gpus=all \
+		-v ./:/app/ \
+		--name Research \
+		mats bash
