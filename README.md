@@ -7,8 +7,8 @@ Description of files, folders and programs.
 
 You can uploud them as Dataset.load_from_disk("...") where Dataset from datasets. 
 
-Both datasets have features 'question', 'answer', 'percent'. 'percent' is the part of final thougths that the model should show. Here is a decompisition of datasets (1 and 2): [part of the data] | [part of the intellectual answer in percent] =
-[10 %, 10 %, 10 %, 10 %, 10 %, 10 %, 10 %, 30 %] | [90 %, 70 %, 50 %, 40 %, 30 %, 20 %, 10 %, ~ 1%]. (For the case with ~1% the prompt changes a little from 'give n% of final thoughts' to 'give the final answer'.) 
+Both datasets have features 'question', 'answer', 'percent'. 'percent' is the part of final thougths that the model should show. Here is a decompisition of datasets (1 and 2): ([part of the data], [part of the intellectual answer in percent]) =
+([10 %, 10 %, 10 %, 10 %, 10 %, 10 %, 10 %, 30 %], [90 %, 70 %, 50 %, 40 %, 30 %, 20 %, 10 %, ~ 1%]). (For the case with ~1% the prompt changes a little from 'give n% of final thoughts' to 'give the final answer'.) 
 
 Programs: 
 
