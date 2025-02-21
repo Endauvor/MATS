@@ -2,6 +2,7 @@ FROM nvcr.io/nvidia/pytorch:25.01-py3
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        git-lfs \
         libsm6 \
         libxext6 \
         libgl1 \
