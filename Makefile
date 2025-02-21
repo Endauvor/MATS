@@ -46,3 +46,12 @@ jupyter:
 
 build:
 	docker build -f Dockerfile -t $(IMAGE_NAME)_$(PURE_TAG) .
+
+run_docker_pure_bash:
+	docker run -it \
+		--ipc=host \
+  		--network=host \
+  		--gpus=all \
+  		-v ./:/app/ \
+  		--name $(CONTAINER_NAME) \
+  		$(IMAGE_NAME) bash
