@@ -1,4 +1,5 @@
-First experiments on fine-tuning. 
+First experiments on fine-tuning.
+Clone it as git clone -b master ..
 
 Description of files, folders and programs. 
 
