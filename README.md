@@ -8,7 +8,7 @@ Description of files, folders and programs.
 Both datasets have features 'question', 'answer', 'percent'. 'percent' is the part of final thougths that the model should show. Here is a decompisition of datasets (1 and 2):
 
 percent of data | percent of intellectual talk
-10 % | 90 %
+10 % | 90 % \n
 10 % | 70 % 
 10 % | 50 %
 10 % | 40 %
