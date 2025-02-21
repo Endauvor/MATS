@@ -13,10 +13,11 @@ Both datasets have features 'question', 'answer', 'percent'. 'percent' is the pa
 Programs: 
 
 1. train.ipynb -- here is a code for fine-tuning. I apply a mask (in the function 'formatting_prompt') for masking a prompt ('question') part of data.
-2. 
+2. createdataset.ipynb -- programs that creates dataset.
+3. simpletalks.ipynb -- generation of simple talks with vllm and the model.
 
 **Here is out plan for today: **
 1. Make dataloader that mixes 2 datasets.
-2. Make dataloader such that on the first step of training the model learn 90% of intellectual answer (that is we need here only part of data with percent = '0.9'), on the second step of training the model learn 70% of intellectual answer, etc. 
-
+2. Make dataloader such that on the first step of training, we use only part of data with percent = '0.9', on the second step of training we use only part of data with percent = '0.7', etc.
+3. Fine-tune and enjoy.
 
