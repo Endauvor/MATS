@@ -17,7 +17,7 @@
 2. get vanilla and fine-tuned models 
 - [x] lazy comparison with each other 
 3. compare residual outputs from each model for generating simple talk 
-- [ ] in the process of generating, catch residual outputs 
+- [x] (almost done, the problem with memory, need help) in the process of generating, catch residual outputs 
 from each layer from vanilla model and fine-tuned one
 - [ ] Compare them for each token generation, ensuring control over each token, 
 and replace them to maintain consistency and continuity in generation.
@@ -29,6 +29,8 @@ Then we amalgamate this templates in masterpiece instructed qustions and answers
 3. simpletalks.ipynb -- generation of simple talks with vllm and the model.
 4. train_unsloth.ipynb -- here is a code for fine-tuning in 4bit.
 5. lazy_inference.ipynb -- here you can find how to use the models
+6. create_test.ipynb -- here you can find how to create tests datasets for different 'percent' value and with usefull information for step 3.
+7. accuracy.ipynb -- here you can find a) the code for accuracy calculating (in terms of probabilities) b) the code for residual differences calculating. For vanilla we need to take trained model with low step. 
 
 
 ## Description of files, folders and programs. 
