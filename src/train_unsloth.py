@@ -10,67 +10,12 @@ from transformers import TrainingArguments, TrainerCallback
 from datasets import Dataset
 from unsloth import FastLanguageModel, is_bfloat16_supported
 
+from src.callbacks import LogToDataFrameCallback
+from src.common.formatter import formatting_prompt
+
 load_dotenv()
 hf_token = os.getenv("HF_TOKEN")
 warnings.filterwarnings("ignore")
-
-
-class LogToDataFrameCallback(TrainerCallback):
-    def __init__(self, log_file="logs.csv", save_every_n_steps=10):
-        self.log_file = log_file
-        self.save_every_n_steps = save_every_n_steps
-        self.logs = []
-
-        if os.path.exists(self.log_file):
-            self.logs = pd.read_csv(self.log_file).to_dict(orient="records")
-
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if logs:
-            logs["step"] = state.global_step
-            self.logs.append(logs)
-
-            if state.global_step % self.save_every_n_steps == 0:
-                self.save_logs()
-
-    def save_logs(self):
-        df = pd.DataFrame(self.logs)
-        df.to_csv(self.log_file, index=False)
-        print(f"Logs saved to {self.log_file}")
-
-    def get_dataframe(self):
-        return pd.DataFrame(self.logs)
-
-
-def formatting_prompt(examples):
-    questions = examples["question"]
-    answers = examples["answer"]
-    input_ids_list = []
-    labels_list = []
-    attention_mask_list = []
-
-    for question, answer in zip(questions, answers):
-        prompt = question
-        full_text = prompt + tokenizer.bos_token + answer + tokenizer.eos_token
-
-        tokenized_full = tokenizer(full_text, truncation=True, padding="max_length", max_length=800)
-        tokenized_prompt = tokenizer(prompt, truncation=True, padding=False)
-
-        prompt_length = len(tokenized_prompt["input_ids"])
-
-        labels = tokenized_full["input_ids"].copy()
-
-        labels[:prompt_length] = [-100] * prompt_length
-
-        input_ids_list.append(tokenized_full["input_ids"])
-        labels_list.append(labels)
-        attention_mask_list.append(tokenized_full["attention_mask"])
-
-    return {
-        "input_ids": input_ids_list,
-        "labels": labels_list,
-        "attention_mask": attention_mask_list  # Возвращаем attention_mask
-    }
-
 
 if __name__ == "__main__":
     experiment_name = "exp2"
@@ -93,8 +38,11 @@ if __name__ == "__main__":
         random_state=32
     )
 
+    def prompt_formatter(example):
+        return formatting_prompt(example, tokenizer)
+
     train_dataset = Dataset.load_from_disk("/workspace/data/train_dataset")
-    training_data = train_dataset.map(formatting_prompt, batched=True)
+    training_data = train_dataset.map(prompt_formatter, batched=True)
     train_dataset.shuffle(seed=random.randint(1, 100))
 
     steps_per_epoch = ceil(len(train_dataset) / (32 * 8))
