@@ -80,7 +80,7 @@ def train_model(train_data, training_args, peft_config)
 
   training_data = train_data.map(formatting_prompt, batched=True)
   model = AutoModelForCausalLM.from_pretrained(
-      "ExplosionNuclear/Llama-3.2-3B-Instruct-final-checkpoints-test",
+      "ExplosionNuclear/Llama-3.2-3B-Instruct-final-checkpoints",
       torch_dtype=torch.bfloat16,
       device_map="cuda",
       attn_implementation="flash_attention_2",
