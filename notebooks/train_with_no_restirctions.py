@@ -22,7 +22,7 @@ def generate_new_dataset(data):
             stop="<\simple_talk>"
         )
 
-      sql_lora_path = snapshot_download(repo_id="ExplosionNuclear/Llama-3.2-3B-Instruct-final-checkpoints-test")
+      sql_lora_path = snapshot_download(repo_id="ExplosionNuclear/Llama-3.2-3B-Instruct-final-checkpoints")
 
       llm = LLM(model="meta-llama/Llama-3.2-3B-Instruct",
                 enable_lora=True,
