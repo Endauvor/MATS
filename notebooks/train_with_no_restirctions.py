@@ -228,7 +228,10 @@ def main():
     train_dataset=training_data
   )
 
-  trainer.train()
+  trainer.train() ####### IN PROGRESS (YOU CAN DELETE THIS PART). 
+      ########## WE NEED PRETRAINING ONLY SO THE MODEL ENDS ITS SIMPLE TALK WITH <\simple_talk>
+
+  
 
   ######## FINAL STAGE ###########
 
