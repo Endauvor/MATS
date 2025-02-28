@@ -192,7 +192,8 @@ def main():
   )
 
   train_data = load_dataset("ExplosionNuclear/good_answers")
-  data_for_pretraining = train_data["train"].select(range(1000))
+  data_for_pretraining = train_data["train"].select(range(1500))
+  data_for_training_with_no_restrictions = train_data["train"].select(range(1500, len(train_data["train"]))
   tokenizer.pad_token = tokenizer.eos_token
   training_data = data_for_pretraining.map(formatting_prompt, batched=True)
 
@@ -233,7 +234,7 @@ def main():
 
   for idx, percent in enumerate(percentage):
 
-      train_data_percent = train_data.filter(lambda example: example['percent'] == percent)
+      train_data_percent = data_for_training_with_no_restrictions.filter(lambda example: example['percent'] == percent)
       split_data = train_data_percent.train_test_split(test_size=0.9)
       train_data_sq_fixed = split_data["train"]
       train_data_sq_free = split_data["test"]
