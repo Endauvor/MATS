@@ -76,7 +76,7 @@ def formatting_prompt(examples):
 
 
 
-def train_model(train_data, training_args, peft_config)
+def train_model(train_data, training_args, peft_config, sq_free)
 
   training_data = train_data.map(formatting_prompt, batched=True)
   model = AutoModelForCausalLM.from_pretrained(
@@ -86,10 +86,13 @@ def train_model(train_data, training_args, peft_config)
       attn_implementation="flash_attention_2",
       token=os.getenv("HF_TOKEN")
       )
-  
-  model.merge_and_unload() # merging with previous adapter, do we need it?
-  model = get_peft_model(model, peft_config)
 
+  if sq_free:
+        model.merge_and_unload() # merging with previous adapter for another percent 
+        model = get_peft_model(model, peft_config)
+  else:
+        continue
+        
   trainer = SFTTrainer(
     model=model,
     tokenizer=tokenizer,
@@ -239,10 +242,10 @@ def main():
       new_train_data = generate_new_dataset(train_data_sq_free)
 
       ######## TRAIN MODEL ONLY ON MATH ANSWERS #############
-      train_model(new_train_data, training_args=training_args_sq, peft_config=peft_config)
+      train_model(new_train_data, training_args=training_args_sq, peft_config=peft_config, sq_free = True)
 
       ######## TRAIN MODEL ON SIMPLE TALKS AND MATH ANSWERS ##########
-      train_model(train_data_sq_fixed, training_args=training_args_fixed, peft_config=peft_config)
+      train_model(train_data_sq_fixed, training_args=training_args_fixed, peft_config=peft_config, sq_free = False)
   
 
   
