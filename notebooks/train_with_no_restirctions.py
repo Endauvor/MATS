@@ -172,7 +172,7 @@ def main():
   ###### PRETRAINING STAGE #######
 
 
-  model_name = "ExplosionNuclear/meta-llama/Llama-3.2-3B-Instruct"
+  model_name = "meta-llama/Llama-3.2-3B-Instruct"
   max_seq_length = 1000
   device_map = "cuda"
 
