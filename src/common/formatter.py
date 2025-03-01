@@ -1,6 +1,6 @@
 
 
-def formatting_prompt(examples, tokenizer):
+def formatting_prompt(examples, tokenizer, max_length=1000):
     questions = examples["question"]
     answers = examples["answer"]
     input_ids_list = []
@@ -11,7 +11,7 @@ def formatting_prompt(examples, tokenizer):
         prompt = question
         full_text = prompt + tokenizer.bos_token + answer + tokenizer.eos_token
 
-        tokenized_full = tokenizer(full_text, truncation=True, padding="max_length", max_length=800)
+        tokenized_full = tokenizer(full_text, truncation=True, padding="max_length", max_length=max_length)
         tokenized_prompt = tokenizer(prompt, truncation=True, padding=False)
 
         prompt_length = len(tokenized_prompt["input_ids"])

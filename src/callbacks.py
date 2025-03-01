@@ -3,6 +3,8 @@ import os
 import pandas as pd
 from transformers import TrainerCallback
 
+from src.tools.generators import DataGenerator
+
 
 class EarlyStoppingLossThresholdCallback(TrainerCallback):
     def __init__(self, patience: int, threshold: float, delta: float = 0.0):
@@ -12,18 +14,20 @@ class EarlyStoppingLossThresholdCallback(TrainerCallback):
         self.num_bad_steps = 0
         self.best_loss = float("inf")
 
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if logs and "loss" in logs and logs["loss"] < self.threshold:
+    def on_step_end(self, args, state, control, **kwargs):
+        logs = kwargs.get("logs", {})
+        if "loss" in logs:
             current_loss = logs["loss"]
-            if current_loss < self.best_loss - self.delta:
-                self.best_loss = current_loss
-                self.num_bad_steps = 0
-            else:
-                self.num_bad_steps += 1
+            if current_loss < self.threshold:
+                if current_loss < self.best_loss - self.delta:
+                    self.best_loss = current_loss
+                    self.num_bad_steps = 0
+                else:
+                    self.num_bad_steps += 1
 
-            if self.num_bad_steps >= self.patience:
-                control.should_early_stop = True
-                print(f"Early stopping triggered at epoch {state.epoch}")
+                if self.num_bad_steps >= self.patience:
+                    control.should_training_stop = True
+                    print(f"Early stopping triggered at epoch {state.epoch}, step {state.global_step}")
 
         return control
 
@@ -63,3 +67,19 @@ class LogToDataFrameCallback(TrainerCallback):
 
     def get_dataframe(self):
         return pd.DataFrame(self.logs)
+
+
+class DataAugmentationCallback(TrainerCallback):
+    def __init__(self, trainer, full_dataset, prompt_formatter, num_epochs=5, step=800):
+        self.trainer = trainer
+        self.num_epochs = num_epochs
+        self.dataset_generator = DataGenerator(self.trainer.model, self.trainer.tokenizer)
+        self.ranges = [range(part, part + step) for part in range(2500, len(full_dataset), step)]
+        self.current_range = 0
+        self.full_dataset = full_dataset
+        self.prompt_formatter = prompt_formatter
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        if (state.epoch + 1) % self.num_epochs == 0:
+            new_samples = self.dataset_generator(self.full_dataset, range_gen=self.ranges[self.current_range])
+            self.trainer.train_dataset = new_samples.map(self.prompt_formatter, batched=True)
