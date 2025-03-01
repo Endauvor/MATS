@@ -120,7 +120,7 @@ class UnslothAlignPropConfig(AlignPropConfig):
     )
     def __init__(
         self,
-        exp_name = 'train_dpo',
+        exp_name = 'train_unsloth_dataset',
         run_name = '',
         seed = 3407,
         log_with = None,
