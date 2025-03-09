@@ -5,7 +5,8 @@ __pycache__/
 
 *.DS_Store
 
-*.ipynb
+/**/.ipynb_checkpoints/
+checkpoints/
 
 models/
 
