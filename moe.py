@@ -1,13 +1,14 @@
 import copy
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Sequence
+from random import random
+from typing import Optional, Dict, Sequence, List, Any
 import logging
 import os
 
 import torch
 import torch.distributed
 import transformers
-from transformers import Trainer, BitsAndBytesConfig, AutoConfig
+from transformers import Trainer, BitsAndBytesConfig, AutoConfig, TrainerCallback
 from datasets import load_dataset
 import numpy as np
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training, PeftModel
@@ -74,15 +75,39 @@ class TrainingArguments(transformers.TrainingArguments):
     )
 
 
+class MultiDatasetEvalCallback(TrainerCallback):
+    def __init__(self, eval_datasets, logger):
+        self.eval_datasets = eval_datasets
+        self.trainer = None
+        self.logger = logger
+        self.in_eval = False
+
+    def on_evaluate(self, args, state, control, **kwargs):
+
+        if self.in_eval:
+            return
+        self.in_eval = True
+
+        for name, dataset in self.eval_datasets.items():
+            result = self.trainer.evaluate(eval_dataset=dataset)
+            self.logger.report_scalar(title="Evaluation", series=str(name), value=result['eval_loss'],
+                                      iteration=state.global_step)
+            print(f"Evaluation Loss on {name}: {result['eval_loss']}")
+
+        self.in_eval = False
+
+
 def get_last_checkpoint(checkpoint_dir):
     if os.path.isdir(checkpoint_dir):
         is_completed = os.path.exists(os.path.join(checkpoint_dir, 'completed'))
-        if is_completed: return None  # already finished
+        if is_completed:
+            return None  # already finished
         max_step = 0
         for filename in os.listdir(checkpoint_dir):
             if os.path.isdir(os.path.join(checkpoint_dir, filename)) and filename.startswith(PREFIX_CHECKPOINT_DIR):
                 max_step = max(max_step, int(filename.replace(PREFIX_CHECKPOINT_DIR + '-', '')))
-        if max_step == 0: return None
+        if max_step == 0:
+            return None
         latest_ckpt_dir = os.path.join(checkpoint_dir, f'{PREFIX_CHECKPOINT_DIR}-{max_step}')
         logger.info(f"Found a previous checkpoint at: {checkpoint_dir}")
         return latest_ckpt_dir
@@ -185,7 +210,7 @@ def train_tokenize_function(examples, tokenizer):
     return data_dict
 
 
-def build_model(model_args, training_args, checkpoint_dir):
+def build_model(model_args, training_args, checkpoint_dir, update_tokenizer=None):
     if not model_args.use_lora:
         assert model_args.bits in [16, 32]
     compute_dtype = (torch.bfloat16 if training_args.bf16 else torch.float16)
@@ -205,6 +230,8 @@ def build_model(model_args, training_args, checkpoint_dir):
         torch_dtype=compute_dtype,
         trust_remote_code=True,
     )
+    if update_tokenizer is not None:
+        model.resize_token_embeddings(len(update_tokenizer))
 
     if compute_dtype == torch.float16 and model_args.bits == 4:
         if torch.cuda.is_bf16_supported():
@@ -260,8 +287,72 @@ def build_model(model_args, training_args, checkpoint_dir):
     return model
 
 
+def randomized_formatting_prompt(examples, p, tokenizer):
+    id_end_of_simple_talk = tokenizer.convert_tokens_to_ids('</simple_talk>')
+    id_begin_of_simple_talk = tokenizer.convert_tokens_to_ids('<simple_talk>')
+
+    instructions = examples["instruction"]
+    answers = examples["answer"]
+
+    input_ids_list = []
+    labels_list = []
+    attention_mask_list = []
+
+    for instruction, answer in zip(instructions, answers):
+
+        prompt = instruction
+
+        full_text = prompt + answer + tokenizer.eos_token
+        tokenized_full = tokenizer(full_text, padding="max_length", max_length=700)
+
+        input_ids = tokenized_full["input_ids"]
+        labels = input_ids.copy()
+
+        if random() < p:  # 0.3
+
+            # no train on simpletalk
+            end_of_simple_talk = input_ids.index(id_end_of_simple_talk)
+            eos_idx = next(
+                i for i, token in enumerate(input_ids) if token == tokenizer.eos_token_id and i >= end_of_simple_talk)
+
+            labels[:end_of_simple_talk + 1] = [-100] * (end_of_simple_talk + 1)  # mask including </simple_talk>
+            labels[eos_idx:] = [-100] * (len(labels) - eos_idx)
+
+        else:
+            # train on simpletalk
+            begin_of_simple_talk = input_ids.index(id_begin_of_simple_talk)
+            eos_idx = next(
+                i for i, token in enumerate(input_ids) if token == tokenizer.eos_token_id and i >= begin_of_simple_talk)
+
+            labels[:begin_of_simple_talk] = [-100] * (begin_of_simple_talk)  # mask after <simple_talk>
+            labels[eos_idx:] = [-100] * (len(labels) - eos_idx)
+
+        input_ids_list.append(input_ids)
+        labels_list.append(labels)
+        attention_mask_list.append(tokenized_full["attention_mask"])
+
+    return {
+        "input_ids": input_ids_list,
+        "labels": labels_list,
+        "attention_mask": attention_mask_list
+    }
+
+
+def data_collator(features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+    input_ids = [feature["input_ids"] for feature in features]
+    labels = [feature["labels"] for feature in features]
+    attention_mask = [feature["attention_mask"] for feature in features]
+
+    batch = {
+        "input_ids": torch.tensor(input_ids, dtype=torch.long),
+        "labels": torch.tensor(labels, dtype=torch.long),
+        "attention_mask": torch.tensor(attention_mask, dtype=torch.long)
+    }
+    return batch
+
+
 def train():
-    experiment_name = "PPO Training - MOE - step4"
+    experiment_name = "PPO Training - MOE - step4 - Refined Data Collator"
     task = Task.init(
         project_name="PPO Training",
         task_name=experiment_name,
@@ -269,10 +360,10 @@ def train():
     )
 
     model_args = ModelArguments(
-        model_name_or_path="/workspace/deepseek-moe-16b-chat",  # Replace $MODEL_PATH with your model path
+        model_name_or_path="/workspace/models/deepseek-moe-16b-chat",  # Replace $MODEL_PATH with your model path
         use_lora=True,
         lora_rank=32,
-        lora_alpha=16,
+        lora_alpha=32,
         double_quant=True,
         trainable="q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj",
         modules_to_save="embed_tokens,lm_head"
@@ -280,16 +371,16 @@ def train():
 
     training_args = TrainingArguments(
         output_dir=f"checkpoints/{experiment_name}",  # Replace $OUTPUT_PATH with your output path
-        num_train_epochs=10,
+        num_train_epochs=20,
         model_max_length=1024,
-        per_device_train_batch_size=42,
+        per_device_train_batch_size=36,
         gradient_accumulation_steps=8,
         save_strategy="steps",
         save_total_limit=100,
-        learning_rate=2e-5,
-        warmup_steps=5,
+        learning_rate=2e-4,
+        warmup_steps=100,
         logging_steps=1,
-        lr_scheduler_type="cosine",
+        lr_scheduler_type="linear",
         gradient_checkpointing=True,
         report_to=[],
         bf16=True,
@@ -298,7 +389,7 @@ def train():
         save_steps=10,
         seed=0,
         push_to_hub=True,
-        hub_model_id="ExplosionNuclear/deepseek-moe-16b-chat-checkpoints-8-experts",
+        hub_model_id="ExplosionNuclear/deepseek-moe-16b-chat-checkpoints-8-experts-collator",
         hub_token=hf_token,
     )
     task.connect(training_args.__dict__)
@@ -312,37 +403,49 @@ def train():
         use_fast=True,
         trust_remote_code=True
     )
+    tokenizer.add_special_tokens({"additional_special_tokens": ["<simple_talk>", "</simple_talk>"]})
 
     task.upload_artifact("training_config", artifact_object="config.json")
 
-    model = build_model(model_args, training_args, None)
+    model = build_model(model_args, training_args, None, update_tokenizer=tokenizer)
+
+
     # freeze_experts(model, keep_experts=8)
 
-    raw_train_datasets = load_dataset("ExplosionNuclear/good_answers")["train"]
-    raw_train_datasets = raw_train_datasets.rename_columns({'question': 'instruction', 'answer': 'output'})
-
-    if training_args.local_rank > 0:
-        torch.distributed.barrier()
-
-    train_dataset = raw_train_datasets.map(
-        train_tokenize_function,
-        batched=True,
-        batch_size=3000,
-        num_proc=32,
-        remove_columns=raw_train_datasets.column_names,
-        load_from_cache_file=True,  # not args.overwrite_cache
-        desc="Running Encoding",
-        fn_kwargs={"tokenizer": tokenizer}
+    raw_train_dataset = load_dataset("ExplosionNuclear/ExpNew1")["train"]
+    raw_train_datasets = (
+        raw_train_dataset
+        .map(randomized_formatting_prompt, batched=True, fn_kwargs={"p": 1.0, "tokenizer": tokenizer})
     )
 
-    data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
+    train_dataset = (
+        raw_train_datasets
+        .select(range(12000))
+        .remove_columns(['instruction', 'answer', 'full_answer', 'percent', 'simple_talk'])
+    )
+    evaluating_data = raw_train_datasets.select(range(12000, 14000))
+    eval_by_percent = {
+        value: evaluating_data.filter(lambda example: example['percent'] == value)
+        for value in [100, 80, 60, 50, 40, 20, 5, 1]
+    }
+
     clearml_callback = ClearMLCallback(task)
 
     trainer = Trainer(
         model=model, tokenizer=tokenizer,
-        args=training_args, callbacks=[clearml_callback],
-        train_dataset=train_dataset, data_collator=data_collator
+        args=training_args, callbacks=[
+            clearml_callback,
+            MultiDatasetEvalCallback(eval_datasets=eval_by_percent, logger=clearml_callback.logger)
+        ],
+        train_dataset=train_dataset,
+        eval_dataset=evaluating_data,
+        data_collator=data_collator,
+
     )
+
+    for callback in trainer.callback_handler.callbacks:
+        if isinstance(callback, MultiDatasetEvalCallback):
+            callback.trainer = trainer
 
     trainer.train()
 
