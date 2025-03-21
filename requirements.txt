@@ -9,7 +9,7 @@ torch~=2.5.1+cu121
 unsloth~=2025.2.15
 numpy~=1.26.4
 packaging~=24.2
-vllm~=0.7.2.dev56+gbf3b79ef
+
 huggingface-hub~=0.28.1
 pandas~=2.2.3
 python-dotenv~=1.0.1
