@@ -486,13 +486,13 @@ def train():
     clearml_callback = ClearMLCallback(task)
 
     trainer = Trainer(
-        model=model, tokenizer=tokenizer,
+        model=model, processing_class=tokenizer,
         args=training_args, callbacks=[
             clearml_callback,
             MultiDatasetEvalCallback(eval_datasets=eval_by_percent, logger=clearml_callback.logger)
         ],
         train_dataset=train_dataset,
-        eval_dataset=evaluating_data,
+        eval_dataset=raw_train_datasets.select(range(6000, 6002)),
         data_collator=data_collator,
 
     )
