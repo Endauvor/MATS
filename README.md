@@ -1,4 +1,4 @@
-# Hyper repo about MATS application, again
+# Hyper repo about MATS application, again, agaain!!!
 
 ## Install
 
@@ -6,6 +6,9 @@
 2. `make jupyter`
 3. select notebook 
 4. enjoy
+
+* `make create_env`, then fill clearml and hf credentials if you want to train something
+
 
 ## Plan
 1. Fine-tuning

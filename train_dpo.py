@@ -1,5 +1,4 @@
 import os
-import warnings
 import logging
 
 from dotenv import load_dotenv
@@ -14,7 +13,7 @@ from src.callbacks import ClearMLCallback, EarlyStoppingLossThresholdCallback, L
 
 load_dotenv()
 hf_token = os.getenv("HF_TOKEN")
-warnings.filterwarnings("ignore")
+
 
 if __name__ == "__main__":
     PatchDPOTrainer()

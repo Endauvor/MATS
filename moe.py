@@ -300,9 +300,7 @@ def randomized_formatting_prompt(examples, p, tokenizer):
 
     for instruction, answer in zip(instructions, answers):
 
-        prompt = instruction
-
-        full_text = prompt + answer + tokenizer.eos_token
+        full_text = instruction + answer + tokenizer.eos_token
         tokenized_full = tokenizer(full_text, padding="max_length", max_length=700)
 
         input_ids = tokenized_full["input_ids"]
@@ -338,36 +336,6 @@ def randomized_formatting_prompt(examples, p, tokenizer):
     }
 
 
-def formatting_prompt(examples, tokenizer):
-    input_ids_list = []
-    labels_list = []
-    attention_mask_list = []
-
-    for prompt, answer in zip(examples["question"], examples["answer"]):
-
-        full_text = prompt + answer + tokenizer.eos_token
-        tokenized_full = tokenizer(full_text, padding="max_length", max_length=1024)
-
-        input_ids = tokenized_full["input_ids"]
-        labels = input_ids.copy()
-        eos_idx = next(
-            i for i, token in enumerate(input_ids) if token == tokenizer.eos_token_id
-        )
-        end_of_question = len(tokenizer.encode(prompt))
-        labels[:end_of_question+1] = [-100] * (end_of_question+1)  # mask after <simple_talk>
-        labels[eos_idx:] = [-100] * (len(labels) - eos_idx)
-
-        input_ids_list.append(input_ids)
-        labels_list.append(labels)
-        attention_mask_list.append(tokenized_full["attention_mask"])
-
-    return {
-        "input_ids": input_ids_list,
-        "labels": labels_list,
-        "attention_mask": attention_mask_list
-    }
-
-
 def data_collator(features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
     input_ids = [feature["input_ids"] for feature in features]
     labels = [feature["labels"] for feature in features]
@@ -384,12 +352,6 @@ def data_collator(features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
 def train():
     experiment_name = "PPO Training - MOE - step4 - Refined Data Collator - w-out Simple Talk"
 
-    task = Task.init(
-        project_name="PPO Training",
-        task_name=experiment_name,
-        output_uri=False
-    )
-
     model_args = ModelArguments(
         model_name_or_path="/workspace/models/deepseek-moe-16b-chat",  # Replace $MODEL_PATH with your model path
         use_lora=True,
@@ -405,6 +367,7 @@ def train():
         num_train_epochs=4,
         model_max_length=1024,
         per_device_train_batch_size=40,
+        per_device_eval_batch_size=30,
         gradient_accumulation_steps=8,
         save_strategy="steps",
         save_total_limit=100,
@@ -420,13 +383,10 @@ def train():
         save_steps=10,
         seed=0,
         push_to_hub=True,
-        hub_model_id="ExplosionNuclear/deepseek-moe-16b-chat-checkpoints-8-experts-collator",
+        hub_model_id="ExplosionNuclear/deepseek-moe-16b-chat-checkpoints-8-experts-collator-w-out-simple-talk",
         hub_token=hf_token,
         evaluation_strategy="epoch",
     )
-    task.connect(training_args.__dict__)
-    task.connect(model_args.__dict__)
-    task.connect(AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True).to_dict())
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
@@ -440,45 +400,40 @@ def train():
 
     # freeze_experts(model, keep_experts=8)
 
-    full = False
-
-    if full:
-        raw_train_dataset = load_dataset("ExplosionNuclear/ExpNew1")["train"]
-        raw_train_datasets = (
-            raw_train_dataset
-            .map(randomized_formatting_prompt, batched=True, fn_kwargs={"p": 1.0, "tokenizer": tokenizer})
-        )
-
-        train_dataset = (
-            raw_train_datasets
-            .select(range(12000))
-            .remove_columns(['instruction', 'answer', 'full_answer', 'percent', 'simple_talk'])
-        )
-        part_range = range(12000, 14000)
-        evaluating_data = raw_train_datasets.select(part_range)
-        percents = set(evaluating_data["percent"])
-
+    dataset_with_simpletalk = False
+    if dataset_with_simpletalk:
+        dataset_name = "ExplosionNuclear/ExpNew1"
     else:
-        raw_train_dataset = load_dataset("ExplosionNuclear/ExpNew2")["train"]
+        dataset_name = "ExplosionNuclear/ExpNew3"
 
-        raw_train_datasets = (
-            raw_train_dataset
-            .map(formatting_prompt, batched=True, fn_kwargs={"tokenizer": tokenizer})
-        )
-        train_dataset = (
-            raw_train_datasets
-            .select(range(6400))
-            .remove_columns(['question', 'answer', 'percent'])
-        )
+    raw_train_dataset = load_dataset(dataset_name)["train"]
+    raw_train_datasets = (
+        raw_train_dataset
+        .map(randomized_formatting_prompt, batched=True, fn_kwargs={"p": 1.0, "tokenizer": tokenizer})
+    )
 
-        part_range = range(6400, 7400)
-        evaluating_data = raw_train_datasets.select(part_range)
-        percents = [0.01]
+    train_dataset = (
+        raw_train_datasets
+        .select(range(12000))
+        .remove_columns(['instruction', 'answer', 'full_answer', 'percent', 'simple_talk'])
+    )
+    part_range = range(12000, 14000)
+    evaluating_data = raw_train_datasets.select(part_range)
 
     eval_by_percent = {
         value: evaluating_data.filter(lambda example: example['percent'] == value)
-        for value in percents
+        for value in [1]
     }
+
+    task = Task.init(
+        project_name="PPO Training",
+        task_name=experiment_name,
+        output_uri=False
+    )
+
+    task.connect(training_args.__dict__)
+    task.connect(model_args.__dict__)
+    task.connect(AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True).to_dict())
 
     task.upload_artifact("training_config", artifact_object="config.json")
 

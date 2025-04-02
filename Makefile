@@ -2,7 +2,7 @@ IMAGE_NAME := akkadeeemikk/mats
 CONTAINER_NAME := research
 
 build_mats:
-	docker build -f ./Dockerfile -t $(IMAGE_NAME) .
+	docker build -f docker/Dockerfile -t $(IMAGE_NAME) .
 
 stop:
 	docker stop $(CONTAINER_NAME)
@@ -18,3 +18,6 @@ run_docker:
 		-v ./:/workspace/ \
 		--name $(CONTAINER_NAME) \
 		$(IMAGE_NAME) bash
+
+create_env:
+	mv .env_template .env

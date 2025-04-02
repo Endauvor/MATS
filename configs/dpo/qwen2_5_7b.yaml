@@ -1,0 +1,61 @@
+project:
+  name: "MATS-dev"
+  experiment_name: "DPO Training - step4"
+  hf_checkpoint: "ExplosionNuclear/Qwen2.5-7B-Instruct-step4-checkpoints"
+
+clearml:
+  project_name: ${project.name}
+  task_name: ${project.experiment_name}
+  output_uri: false
+
+dataset:
+  name: "ExplosionNuclear/dpo_dataset_final"
+  config: "default"
+
+model:
+  name: "unsloth/Qwen2.5-7B-Instruct"
+  max_seq_length: 1000
+  dtype: null
+
+peft:
+  r: 16
+  lora_alpha: 16
+  lora_dropout: 0
+  use_rslora: true
+  use_gradient_checkpointing: "unsloth"
+  random_state: 32
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "up_proj"
+    - "down_proj"
+    - "o_proj"
+    - "gate_proj"
+
+trainer:
+  lr_scheduler_type: "cosine"
+  learning_rate: 3e-5
+  loss_type: "ipo"
+  per_device_train_batch_size: 20
+  gradient_accumulation_steps: 4
+  num_train_epochs: 50
+  logging_steps: 1
+  optim: "adamw_8bit"
+  warmup_ratio: 0.1
+  warmup_steps: 3
+  output_dir: checkpoints/${project.experiment_name}
+  save_strategy: "steps"
+  save_steps: 10
+  seed: 0
+  push_to_hub: true
+  hub_model_id: ${project.hf_checkpoint}
+
+callbacks:
+  early_stopping:
+    patience: 15
+    threshold: 1.0
+    delta: 0.1
+  log_to_csv:
+    log_file: "logs_DPO Training - step4.csv"
+    save_every_n_steps: 10
