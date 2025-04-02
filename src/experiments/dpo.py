@@ -4,7 +4,7 @@ from datasets import load_dataset
 from trl import DPOConfig
 from unsloth import is_bfloat16_supported, FastLanguageModel, PatchDPOTrainer
 
-from src.core.experiment import Experiment
+from src.experiments.default import Experiment
 
 
 class UnslothExperiment(Experiment):

@@ -1,13 +1,9 @@
 import argparse
 
-from dotenv import load_dotenv
 from trl import DPOTrainer
 
 from src.callbacks import ClearMLCallback
-from src.containers.dpo import UnslothExperiment
-
-load_dotenv()
-
+from src.experiments.dpo import UnslothExperiment
 
 parser = argparse.ArgumentParser(description="Run DPO training")
 parser.add_argument(
