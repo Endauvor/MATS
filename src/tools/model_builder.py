@@ -41,7 +41,7 @@ def configured_build_model(
 ):
     model_args = ModelArguments(**vars(model_args_conf))
     model_args.config = AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-    model_args.config.n_routed_experts = model_args_conf.n_routed_experts
+    model_args.config.num_experts_per_tok = model_args_conf.num_experts_per_tok
     model = build_model(model_args, training_args, checkpoint_dir, update_tokenizer)
     if model_args_conf.keep_experts != -1:
         freeze_experts(model, keep_experts=model_args_conf.keep_experts)
