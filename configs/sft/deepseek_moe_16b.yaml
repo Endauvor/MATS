@@ -1,0 +1,60 @@
+project:
+  name: "MATS"
+  experiment_name: "SFT Training - DeepSeek MOE"
+  hf_checkpoint: "ExplosionNuclear/deepseek-moe-16b-chat-checkpoints-8-experts-collator-w-out-simple-talk"
+
+clearml:
+  project_name: ${project.name}
+  task_name: ${project.experiment_name}
+  output_uri: false
+
+dataset:
+  name: "ExplosionNuclear/ExpNew1"
+  train_size: 12000
+  eval_size: 2000
+  max_length: 800
+  p: 1.0  # probability for randomized formatting
+
+model:
+  name: "deepseek-ai/deepseek-moe-16b-chat"
+  dtype: "bfloat16"
+  device_map: "cuda"
+  attn_implementation: "flash_attention_2"
+  special_tokens:
+    - "<simple_talk>"
+    - "</simple_talk>"
+
+
+model_args:
+  model_name_or_path: ${model.name}
+  use_lora: true,
+  lora_rank: 32,
+  lora_alpha: 32,
+  double_quant: true,
+  trainable: "q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj",
+  modules_to_save: "embed_tokens,lm_head"
+  unfreeze_experts: -1
+  n_routed_experts: 8
+
+
+trainer:
+  output_dir: "./flux1-dev-checkpoints"
+  num_train_epochs: 8
+  per_device_train_batch_size: 16
+  gradient_accumulation_steps: 8
+  learning_rate: 3e-4
+  weight_decay: 0.01
+  lr_scheduler_type: "linear"
+  warmup_steps: 100
+  logging_steps: 10
+  save_steps: 100
+  bf16: true
+  tf32: true
+  gradient_checkpointing: true
+  optim: "adamw_torch"
+  report_to: []
+  max_grad_norm: 0.3
+  ddp_find_unused_parameters: false
+  push_to_hub: true
+  hub_model_id: ${project.hf_checkpoint}
+  eval_strategy: "epoch"
