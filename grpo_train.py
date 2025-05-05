@@ -5,6 +5,7 @@ os.environ['CLEARML_DISABLE_AUTO_IMPORTS'] = '1'
 
 # from src.callbacks import ClearMLCallback
 import torch
+import unsloth
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 from unsloth import FastLanguageModel
@@ -103,7 +104,7 @@ def main():
         logging_steps = 1,
         per_device_train_batch_size = 16, 
         gradient_accumulation_steps = 4, 
-        num_generations = 32, 
+        num_generations = 16, 
         max_prompt_length = max_prompt_length,
         max_completion_length = max_seq_length - max_prompt_length,
         num_train_epochs = 1, 
