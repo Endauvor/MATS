@@ -1,12 +1,15 @@
 import os
+os.environ['CLEARML_DISABLE_AUTO_IMPORTS'] = '1'
+# os.environ['TORCH_LOGS'] = "+dynamo"
+# os.environ['TORCHDYNAMO_VERBOSE'] = "1"
+
+# from src.callbacks import ClearMLCallback
 import torch
-import unsloth
-import datasets
 from datasets import load_dataset
-from transformers import TrainingArguments
 from trl import GRPOConfig, GRPOTrainer
 from unsloth import FastLanguageModel
 from dotenv import load_dotenv
+# from clearml import Task
 
 from src.tools.utils import (
     extract_task_and_answer,
@@ -19,6 +22,10 @@ from src.tools.utils import (
     check_simpletalk,
 
 )
+
+
+# import torch._dynamo
+# torch._dynamo.config.suppress_errors = True
 
 load_dotenv()
 hf_token = os.getenv("HF_TOKEN")
@@ -85,7 +92,6 @@ def main():
         "answer": x["final_answer"],
     })
 
-    
     training_args = GRPOConfig(
         learning_rate = 5e-6,
         adam_beta1 = 0.9,
@@ -104,16 +110,22 @@ def main():
         max_steps = 3000, 
         save_steps = 100, 
         max_grad_norm = 0.1,
-        report_to = "none", 
         output_dir = output_dir,
         push_to_hub = True, 
         hub_token = hf_token, 
         seed = 3407, 
+        report_to = [],
     )
+
+        
+    # # Initialize ClearML Task before Trainer to potentially avoid torch.compile conflicts
+    # clearml_task = Task.init(
+    #     project_name="MATS", task_name="GRPO Training - meta-Llama-3.1-8B-Instruct", output_uri=False
+    #     )
 
     trainer = GRPOTrainer(
         model = model,
-        tokenizer = tokenizer,
+        processing_class = tokenizer,
         reward_funcs = [
             match_format_exactly, # reward for correct delimeters in the answer, that is <simple_talk>, </simple_talk>, <SOLUTION>, </SOLUTION>
             match_format_approximately, # reward for some correct delimeters
@@ -123,6 +135,7 @@ def main():
         ],
         args = training_args,
         train_dataset = dataset,
+        # callbacks = [ClearMLCallback(clearml_task)], # Pass pre-initialized task
     )
 
     print("Start training...")

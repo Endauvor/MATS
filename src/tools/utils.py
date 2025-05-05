@@ -126,7 +126,7 @@ def check_numbers(prompts, completions, answer, **kwargs):
     ]
 
     scores = []
-    print('*'*20, f"Question:\n{question}", f"\nCorrect Math Answer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
+    # print('*'*20, f"Question:\n{question}", f"\nCorrect Math Answer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
     for guess, true_answer in zip(extracted_responses, answer):
         if guess is None:
             scores.append(0)
